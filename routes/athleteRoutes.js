@@ -1,47 +1,104 @@
 // backend/routes/athleteRoutes.js
 const express = require('express');
 const Athlete = require('../models/Athlete');
-
+const { protect } = require('../middleware/authMiddleware'); // Middleware de proteção
 const router = express.Router();
+const AthleteController = require('../controllers/AthleteController');
+const User = require('../models/User'); // Importando o modelo de usuário
+const bcrypt = require('bcrypt'); // Certifique-se de ter importado o bcrypt para o hash de senha
 
-// Criar um novo atleta
+
+// Rota para criar um atleta e um usuário ao mesmo tempo
+// Rota para criar um atleta e um usuário ao mesmo tempo
 router.post('/', async (req, res) => {
     try {
-        const novoAtleta = new Athlete(req.body);
-        await novoAtleta.save();
-        res.status(201).json(novoAtleta);
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
+      const { nome, idade, email, telefone, sexo, nivel, filial, password } = req.body;
+  
+      // Verificando se o email do usuário já existe
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({ message: 'Este email já está em uso.' });
+      }
+      
+        // Log para mostrar a senha antes de ser criptografada
+        console.log('Senha original:', password);
 
-// Buscar atletas com paginação e filtros
-router.get('/', async (req, res) => {
+      // CRIPTOGRAFANDO SENHA
+      //const hashedPassword = await bcrypt.hash(password, 10);  // 10 é o número de salt rounds
+
+      // Criando o usuário com o email e senha fornecidos
+      const newUser = new User({
+        email,
+        password, //: hashedPassword // Salvando a senha criptografada no banco de dados
+      });
+  
+      await newUser.save(); // Salvando o usuário  
+  
+      // Criando o atleta com os dados fornecidos e associando ao usuário
+      const newAthlete = new Athlete({
+        nome,
+        idade,
+        email,
+        telefone,
+        sexo,
+        nivel,
+        filial,
+        userId: newUser._id, // Associando o atleta ao usuário
+      });
+  
+      await newAthlete.save(); // Salvando o atleta
+  
+      // Retornando a resposta com os dados do atleta e usuário
+      res.status(201).json({
+        message: 'Atleta e usuário criados com sucesso!',
+        athlete: newAthlete,
+        user: newUser,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Erro ao criar o atleta e o usuário.' });
+    }
+  });
+  
+
+// Rota para obter atletas com filtros e paginação
+router.get('/', protect, async (req, res) => {
     try {
-        const { page = 1, limit = 10, nome, nivel, sexo } = req.query; // Recebe parâmetros de consulta
-        const query = {};
-
-        if (nome) query.nome = { $regex: nome, $options: 'i' }; // Filtro por nome (case-insensitive)
-        if (nivel) query.nivel = nivel;
-        if (sexo) query.sexo = sexo;
-
-        const atletas = await Athlete.find(query)
-            .skip((page - 1) * limit) // Pular para a página solicitada
-            .limit(limit) // Limitar o número de resultados por página
-            .exec();
-
-        const total = await Athlete.countDocuments(query); // Conta o total de atletas para a paginação
-
-        res.json({
-            atletas,
-            total,
-            pages: Math.ceil(total / limit),
-            currentPage: page,
-        });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+      // Paginação
+      const page = parseInt(req.query.page) || 1; // Padrão: página 1
+      const limit = parseInt(req.query.limit) || 10; // Padrão: 10 itens por página
+      const skip = (page - 1) * limit;
+  
+      // Filtros (por exemplo, por nível ou idade)
+      const filters = {};
+      if (req.query.nivel) {
+        filters.nivel = req.query.nivel;
+      }
+      if (req.query.idade) {
+        filters.idade = { $gte: req.query.idade }; // Maior ou igual à idade fornecida
+      }
+  
+      // Buscando atletas no banco de dados com os filtros e a paginação
+      const athletes = await Athlete.find(filters)
+        .skip(skip) // Pulando os primeiros 'skip' itens
+        .limit(limit); // Limitando a quantidade de itens retornados
+  
+      // Contando o total de atletas para calcular o número de páginas
+      const totalAthletes = await Athlete.countDocuments(filters);
+  
+      // Calculando o número total de páginas
+      const totalPages = Math.ceil(totalAthletes / limit);
+  
+      res.status(200).json({
+        totalPages,
+        currentPage: page,
+        athletes,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Erro ao obter atletas.' });
     }
-});
+  });
 
 // Ler um atleta específico pelo ID
 router.get('/:id', async (req, res) => {
