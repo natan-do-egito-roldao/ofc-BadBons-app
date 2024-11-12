@@ -62,6 +62,14 @@ Este repositório contém o backend de uma aplicação para gestão e controle d
 - `PUT /api/atletas/:id`: Atualizar um atleta existente.
 - `DELETE /api/atletas/:id`: Excluir um atleta.
 
+Filiais
+- 'POST /api/filiais': Criar uma nova filial.
+- GET /api/filiais: Buscar todas as filiais.
+- GET /api/filiais/:id: Buscar uma filial específica pelo ID.
+- PUT /api/filiais/:id: Atualizar uma filial existente.
+- DELETE /api/filiais/:id: Excluir uma filial.
+
+
 ## Contribuição
 
 Sinta-se à vontade para contribuir para o projeto! Faça um fork, crie uma branch e submeta um pull request.
