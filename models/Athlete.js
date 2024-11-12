@@ -31,13 +31,16 @@ const athleteSchema = new mongoose.Schema({
         enum: ['Iniciante', 'Intermediário', 'Avançado'], // Validação para os valores de "nivel"
     },
     filial: {
-        type: String,
-        required: [true, 'Filial é obrigatória'],
+        type: mongoose.Schema.Types.ObjectId, ref: 'Filial', required: [true] // Adiciona a Referencia do Schema Filial ao Schema de Atleta
     },
     criadoEm: {
         type: Date,
         default: Date.now,
     },
+    password: {  // Campo de senha
+        type: String,
+        required: true,
+    }
 });
 
 const Athlete = mongoose.model('Athlete', athleteSchema);

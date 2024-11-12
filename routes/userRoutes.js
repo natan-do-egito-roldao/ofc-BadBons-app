@@ -1,52 +1,26 @@
 // backend/routes/userRoutes.js
 const express = require('express');
-const User = require('../models/User');
-const Athlete = require('../models/Athlete');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
+require('dotenv').config(); // Carrega as variáveis do .env
 
-// Rota para criar usuário e perfil de atleta juntos
-router.post('/createUserAndAthlete', async (req, res) => {
+// Rota para login do administrador
+router.post('/admin/login', async (req, res) => {
   try {
-    // Desestruturando os dados da requisição
-    const { email, password, nome, idade, telefone, sexo, nivel, filial } = req.body;
+    const { email, password } = req.body;
 
-    // Verificando se o email já existe
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Este email já está em uso.' });
+    // Verifica se as credenciais são iguais às do administrador no .env
+    if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
+      // Gera um token JWT
+      const token = jwt.sign({ role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '1h' });
+      return res.status(200).json({ message: 'Login bem-sucedido', token });
     }
 
-    // Criando o usuário
-    const newUser = new User({ email, password });
-    await newUser.save();
-
-    // Criando o perfil de atleta
-    const newAthlete = new Athlete({
-      userId: newUser._id, // Associando o atleta ao usuário
-      nome,
-      idade,
-      telefone,
-      sexo,
-      nivel,
-      filial,
-    });
-
-    // Salvando o perfil de atleta
-    await newAthlete.save();
-
-    // Gerando o token JWT para o novo usuário
-    const token = newUser.generateToken();
-
-    // Respondendo com sucesso
-    res.status(201).json({
-      message: 'Usuário e perfil de atleta criados com sucesso!',
-      user: newUser,
-      athlete: newAthlete,
-      token,
-    });
+    // Responde com erro se as credenciais estiverem incorretas
+    res.status(401).json({ message: 'Credenciais inválidas' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Erro ao criar usuário e perfil de atleta.' });
+    res.status(500).json({ message: 'Erro ao realizar login do administrador' });
   }
 });
 
