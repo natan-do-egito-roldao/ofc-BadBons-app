@@ -30,7 +30,7 @@ Este repositório contém o backend de uma aplicação para gestão e controle d
 
 1. Clone o repositório:
    ```bash
-   git clone https://github.com/seu-usuario/badbons-app-backend.git
+   git clone https://github.com/eusuez/ofc-BadBons-app.git
    ```
    
 2. Instale as dependências:
