@@ -5,9 +5,132 @@ const Athlete = require('../models/Athlete');
 const Filial = require('../models/Filial');
 const verifyAdminToken = require('../middleware/adminAuthMiddleware'); // Middleware para autenticação do admin
 const router = express.Router();
+const Treino = require('../models/Treinos');
+const { Ranking, Aluno } = require('../models/RankingSchema');
 
-// Aplicando o middleware de verificação do admin em todas as rotas
-router.use(verifyAdminToken); // Agora todas as rotas desta rota estarão protegidas
+// Rota para aluno declarar conclusão de um treino
+router.post('/concluir-treino', async (req, res) => {
+    try {
+        const { alunoId, treinoId } = req.body;
+
+        // Busca o aluno pelo ID
+        const aluno = await Athlete.findById(alunoId);
+
+        if (!aluno) {
+            return res.status(404).json({
+                success: false,
+                message: 'Aluno não encontrado.',
+            });
+        }
+
+        // verifica se o treino está na lista de pendentes ou já foi concluido
+        const treinoJaConcluido = aluno.treinosConcluidos.includes(treinoId);
+        const treinoPendente = aluno.treinosPendentes.includes(treinoId);
+
+        if (treinoJaConcluido) {
+            return res.status(400).json({
+                success: false,
+                message: 'Este treino já foi concluido',
+            });
+        }
+
+        if (!treinoPendente) {
+            return res.status(400).json({
+                success: false,
+                message: 'este treino não está na lista de pendentes.'
+            });
+        }
+
+        // Adiciona o treino aos concluidos  e remove dos pendentes
+        aluno.treinosConcluidos.push(treinoId);
+        aluno.treinosPendentes = aluno.treinosPendentes.filter(
+            (id) => id.toString() !== treinoId
+        );
+
+      // se todos os treinos pendens foram concluidos, altera o status para aguardando prova
+      if (aluno.treinosPendentes.length === 0 && aluno.statusNivel !== 'Aguardando Prova') {
+        aluno.statusNivel = 'Aguardando Prova';
+    }
+
+        // salva as alterações no banco de dados 
+        await aluno.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Treino concluido com sucess!.',
+            treinosPendentes: aluno.treinosPendentes,
+            treinosConcluidos: aluno.treinosConcluidos,
+        });
+    }catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'error ao concluir o treino.',
+            error: error.message,
+        });
+    }
+});
+
+// Aplicando o middleware de verificação do admin em todas as rotas apartir daqui
+router.use(verifyAdminToken);
+
+// rota para o profeesor avaliar o aluno
+router.post('/revisar-aluno', async (req, res) => {
+    try {
+        const { alunoId, status, treinosReprovados } = req.body;
+
+        //verifica se o aluno existe
+        const aluno = await Athlete.findById(alunoId);
+        if (!aluno) {
+            return res.status(404).json({ success: false, message: 'Aluno não encontrado.'});
+        }
+
+        // atualiza o status do nivel do aluno
+        aluno.statusNivel = status;
+
+        if (status === 'Aprovado') {
+      
+            if (aluno.nivel < 3) {
+                aluno.nivel += 1;
+            }
+      
+            // Busca treinos do novo nível
+            const novosTreinos = await Treino.find({ nivel: aluno.nivel });
+      
+            // Libera os treinos do novo nível
+            const novosTreinosIds = novosTreinos.map((treino) => treino._id);
+      
+            // Atualiza os treinos pendentes com os novos treinos, sem sobrescrever os concluídos
+            aluno.treinosPendentes = [
+              ...new Set([...aluno.treinosPendentes, ...novosTreinosIds]), // Garante que não há duplicatas
+            ];
+      
+            // Salva as alterações
+            await aluno.save();
+      
+            return res.status(200).json({
+              success: true,
+              message: 'Prova concluída com sucesso. Nível atualizado.',
+              novoNivel: aluno.nivel,
+              treinosLiberados: novosTreinosIds,
+            });
+          } else {
+            return res.status(400).json({ success: false, message: 'Status inválido.' });
+          }
+      
+
+        // se o aluno for reprovado, move os treinos indicados como reprovado para pendentes
+        if (status === 'Reprovado') {
+            aluno.treinosPendentes = aluno.treinosPendentes.concat(treinosReprovados); // apenas os treinos reprovados
+            // Remove os treinos reprovados dos concluídos
+            aluno.treinosConcluidos = aluno.treinosConcluidos.filter(treino => !treinosReprovados.includes(treino.toString())  // Comparação correta entre ObjectId e string
+        );
+        }
+        await aluno.save();
+        res.status(200).json({ success: true, message: 'status do aluno atualizado'});
+    }catch (error) {
+        res.status(500).json({success: false, message: 'error ao revisar o aluno', error: error.message});
+    }
+});
 
 // Rota para criar um atleta com autenticação de admin
 router.post('/', verifyAdminToken, async (req, res) => {
@@ -15,7 +138,23 @@ router.post('/', verifyAdminToken, async (req, res) => {
 
     try {
         // Desestruturando os dados enviados na requisição
-        const { nome, idade, email, telefone, sexo, nivel, filial, password } = req.body;
+        const { nome, idade, email, telefone, sexo, nivel = Number(req.body.nivel), filial, password } = req.body;
+
+        if (!nome || !nivel) {
+            return res.status(400).json({ success:false, message: 'nome e nivel são obrigatorios'})
+        }
+
+
+        // busca os treinos com base no nivel
+        console.log('Nível fornecido:', nivel);
+        const treinos = await Treino.find({ nivel: { $lte: nivel } });
+        console.log('Treinos encontrados:', treinos);
+
+
+
+        if (treinos.length === 0) {
+            return res.status(404).json({ message: 'Nenhum treino encontrado' });
+        }
 
         // Verificando se o filial fornecido existe
         const filialExistente = await Filial.findById(filial);
@@ -36,7 +175,8 @@ router.post('/', verifyAdminToken, async (req, res) => {
             sexo,
             nivel,
             filial,
-            password: hashedPassword // Salva a senha criptografada
+            password: hashedPassword, // Salva a senha criptografada
+            treinosPendentes: treinos.map(treino => treino._id),
         });
 
         // Salvando o atleta no banco de dados

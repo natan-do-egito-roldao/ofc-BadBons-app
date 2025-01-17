@@ -26,9 +26,8 @@ const athleteSchema = new mongoose.Schema({
         enum: ['Masculino', 'Feminino', 'Outro'], // Validação para garantir que sexo seja uma das opções
     },
     nivel: {
-        type: String,
-        required: [true, 'Nível é obrigatório'],
-        enum: ['Iniciante', 'Intermediário', 'Avançado'], // Validação para os valores de "nivel"
+        type: Number,
+        required: [true, 'Nível é obrigatório']
     },
     filial: {
         type: mongoose.Schema.Types.ObjectId, ref: 'Filial', required: [true] // Adiciona a Referencia do Schema Filial ao Schema de Atleta
@@ -40,7 +39,24 @@ const athleteSchema = new mongoose.Schema({
     password: {  // Campo de senha
         type: String,
         required: true,
-    }
+    },
+    statusNivel: {
+        type: String,
+        enum: ['Aguardando Prova', 'Aprovado', 'Reprovado'], default: 'Aguardando Prova'
+    },
+    isProfessor: { 
+        type: Boolean, default: false 
+    },
+    treinosPendentes: [{ 
+        type: mongoose.Schema.Types.ObjectId, ref: 'Treinos' 
+    }],
+    treinosConcluidos: [{ 
+        type: mongoose.Schema.Types.ObjectId, ref: 'Treinos' 
+    }],
+    rankingCorrespondente: { type: mongoose.Schema.Types.ObjectId, ref: 'Ranking' },
+    rankingDuplaCorrespondente: { type: mongoose.Schema.Types.ObjectId, ref: 'Ranking' },
+    desafiosConcluidos: [{ 
+        type: mongoose.Schema.Types.ObjectId, ref: 'desafio' }]
 });
 
 const Athlete = mongoose.model('Athlete', athleteSchema);

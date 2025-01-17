@@ -1,10 +1,9 @@
 // backend/middleware/adminAuthMiddleware.js
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
 require('dotenv').config();
 
 const verifyAdminToken = async (req, res, next) => {
-    const { token} = req.body; // Token e senha no corpo da requisição
+    const { token} = req.body; // Token no corpo da requisição
 
     if (!token) {
         return res.status(401).json({ message: 'Token não fornecido.' });
